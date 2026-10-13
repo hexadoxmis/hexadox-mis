@@ -72,7 +72,7 @@ async function init(){
  year.innerHTML=[cy-1,cy,cy+1].map(y=>`<option value="${y}" ${y===cy?'selected':''}>${y}</option>`).join('');
  let z=await client.from('hqs').select('id,hq_name').eq('active',true).order('hq_name');if(z.error){msg(z.error.message,true);return}hqs=z.data||[];
  hq.innerHTML='<option value="">All HQs</option>'+hqs.map(x=>`<option value="${x.id}">${esc(x.hq_name)}</option>`).join('');
- z=await client.from('products').select('id,product_name').eq('active',true).order('product_name');if(z.error){msg(z.error.message,true);return}products=z.data||[];
+ z=await client.from('products').select('id,product_name').order('product_name');if(z.error){msg(z.error.message,true);return}products=z.data||[];
  product.innerHTML='<option value="">All Products</option>'+products.map(x=>`<option value="${x.id}">${esc(x.product_name)}</option>`).join('');
  await loadMarkets();
 }

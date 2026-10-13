@@ -708,7 +708,6 @@ async function loadProducts() {
                 price_feb_2027,
                 price_mar_2027
             `)
-            .eq("active", true)
             .order("product_name");
 
     console.log("PRODUCTS:", data);
@@ -736,7 +735,7 @@ async function loadProducts() {
     if (products.length === 0) {
 
         productArea.innerHTML =
-            '<div class="loading">No active products found.</div>';
+            '<div class="loading">No products found.</div>';
 
         return;
     }
@@ -795,7 +794,7 @@ async function startProductEntry() {
     }
     await loadProducts();
     if (products.length === 0) {
-        showMessage("No active products available.", "error");
+        showMessage("No products available.", "error");
         return;
     }
     renderProductTable();
@@ -809,188 +808,40 @@ async function startProductEntry() {
 function renderProductTable() {
     const productArea = document.getElementById("productArea");
     productArea.innerHTML = `
-        <div class="entry-summary">Enter only products that have sale. Use + ADD PRODUCT for the next row.</div>
+        <div class="entry-summary">All products are listed below. Leave quantities at 0 and set PTS to 0 for products not used this month.</div>
         <div class="table-container">
             <table>
                 <thead><tr>
-                    <th>#</th><th>Product</th><th>Primary PTS</th><th>Primary Qty</th><th>Primary Value</th><th>Free Units Reimbursement Units</th><th>Free Units Reimbursement Value</th><th>Secondary PTS</th><th>Secondary Qty</th><th>Secondary Value</th><th>Action</th>
+                    <th>#</th><th>Product</th><th>Primary PTS</th><th>Primary Qty</th><th>Primary Value</th><th>Free Units Reimbursement Units</th><th>Free Units Reimbursement Value</th><th>Secondary PTS</th><th>Secondary Qty</th><th>Secondary Value</th>
                 </tr></thead>
                 <tbody id="productRows"></tbody>
                 <tfoot><tr class="totals-row"><td colspan="3">TOTAL</td><td id="total-primary-units">0</td><td id="total-primary">0.00</td><td id="total-free-units">0</td><td id="total-free-value">0.00</td><td id="total-secondary-units">0</td><td id="total-secondary">0.00</td><td>-</td></tr></tfoot>
             </table>
         </div>
         <div class="submit-area" style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-            <button class="add-row-button" onclick="addProductRow()">+ ADD PRODUCT</button>
             <button id="submitButton" class="submit-button" onclick="submitData()">SAVE DATA</button>
         </div>`;
-    addProductRow();
-}
-
-function addProductRow() {
-
-    const tbody =
-        document.getElementById("productRows");
-
-    if (!tbody) return;
-
-    const row =
-        document.createElement("tr");
-
-    row.className =
-        "product-entry-row";
-
-    row.innerHTML = `
-        <td></td>
-
-        <td>
-            <select
-                class="product-select"
-                onchange="productChanged(this)">
-                <option value="">Select Product</option>
-
-                ${products.map(product => `
-                    <option value="${escapeHTML(product.id)}">
-                        ${escapeHTML(product.product_name)}
-                    </option>
-                `).join("")}
-
-            </select>
-        </td>
-
-        <td>
-            <input
-                type="number"
-                class="primary-pts"
-               
-                step="0.01"
-                placeholder="Primary PTS"
-                oninput="calculateEntryRow(this.closest('tr'))">
-        </td>
-
-        <td>
-            <input
-                type="number"
-                class="primary"
-                step="1"
-                placeholder="0"
-                oninput="calculateEntryRow(this.closest('tr'))">
-        </td>
-
-        <td class="value-cell primary-value">
-            0.00
-        </td>
-
-        <td>
-            <input
-                type="number"
-                class="free-units"
-               
-                step="1"
-                placeholder="0"
-                oninput="calculateEntryRow(this.closest('tr'))">
-        </td>
-
-        <td class="value-cell free-value">
-            0.00
-        </td>
-
-        <td>
-            <input
-                type="number"
-                class="secondary-pts"
-                step="0.01"
-                placeholder="Secondary PTS"
-                oninput="calculateEntryRow(this.closest('tr'))">
-        </td>
-
-        <td>
-            <input
-                type="number"
-                class="secondary"
-                step="1"
-                placeholder="0"
-                oninput="calculateEntryRow(this.closest('tr'))">
-        </td>
-
-        <td class="value-cell secondary-value">
-            0.00
-        </td>
-
-        <td>
-            <button
-                type="button"
-                class="remove-row-button"
-                onclick="removeProductRow(this)">
-                REMOVE
-            </button>
-        </td>
-    `;
-
-    tbody.appendChild(row);
-
-    updateRowNumbers();
-}
-
-function productChanged(select) {
-
-    const selectedId =
-        select.value;
-
-    const row =
-        select.closest("tr");
-
-    if (
-        selectedId &&
-        [...document.querySelectorAll(".product-select")]
-            .some(other =>
-                other !== select &&
-                other.value === selectedId
-            )
-    ) {
-
-        showMessage(
-            "This product is already selected. Please choose another product.",
-            "error"
-        );
-
-        select.value = "";
-
-        row.querySelector(".primary-pts").value = "";
-        row.querySelector(".secondary-pts").value = "";
-
-        calculateEntryRow(row);
-
-        return;
-    }
-
-    // Default PTS from the selected month's Product Price Master.
-    // Keep it editable for transaction-specific adjustments.
-    const product = products.find(item => String(item.id) === String(selectedId));
+    const tbody = document.getElementById("productRows");
     const month = parseInt(document.getElementById("month").value);
     const year = parseInt(document.getElementById("year").value);
-    const monthlyPrice = product ? getMonthlyPrice(product, month, year) : null;
-    const masterPts = monthlyPrice === null || monthlyPrice === undefined || monthlyPrice === "" ? "" : Number(monthlyPrice).toFixed(2);
-    row.querySelector(".primary-pts").value = masterPts;
-    row.querySelector(".secondary-pts").value = masterPts;
-    calculateEntryRow(row);
-}
-
-function removeProductRow(button) {
-    const row = button.closest("tr");
-    const tbody = document.getElementById("productRows");
-    if (!row || !tbody) return;
-    if (tbody.children.length === 1) {
-        row.querySelector(".product-select").value = "";
-        row.querySelector(".primary-pts").value = "";
-        row.querySelector(".secondary-pts").value = "";
-        row.querySelector(".primary").value = "";
-        row.querySelector(".free-units").value = "";
-        row.querySelector(".secondary").value = "";
-        calculateEntryRow(row);
-        return;
-    }
-    row.remove();
-    updateRowNumbers();
+    products.forEach((product, index) => {
+        const monthlyPrice = getMonthlyPrice(product, month, year);
+        const pts = monthlyPrice == null || monthlyPrice === "" ? 0 : Number(monthlyPrice);
+        const row = document.createElement("tr");
+        row.className = "product-entry-row";
+        row.dataset.productId = product.id;
+        row.innerHTML = `
+            <td>${index + 1}</td><td class="product-name">${escapeHTML(product.product_name)}</td>
+            <td><input type="number" class="primary-pts" step="0.01" value="${pts}" oninput="calculateEntryRow(this.closest('tr'))"></td>
+            <td><input type="number" class="primary" step="1" value="0" oninput="calculateEntryRow(this.closest('tr'))"></td>
+            <td class="value-cell primary-value">0.00</td>
+            <td><input type="number" class="free-units" step="1" value="0" oninput="calculateEntryRow(this.closest('tr'))"></td>
+            <td class="value-cell free-value">0.00</td>
+            <td><input type="number" class="secondary-pts" step="0.01" value="${pts}" oninput="calculateEntryRow(this.closest('tr'))"></td>
+            <td><input type="number" class="secondary" step="1" value="0" oninput="calculateEntryRow(this.closest('tr'))"></td>
+            <td class="value-cell secondary-value">0.00</td>`;
+        tbody.appendChild(row);
+    });
     calculateTotals();
 }
 
@@ -1047,14 +898,14 @@ async function submitData() {
 
     const details = [];
     for (const row of [...document.querySelectorAll("#productRows .product-entry-row")]) {
-        const productId = row.querySelector(".product-select").value;
+        const productId = row.dataset.productId;
         const primaryPtsValue = row.querySelector(".primary-pts").value.trim();
         const secondaryPtsValue = row.querySelector(".secondary-pts").value.trim();
         const primaryValue = row.querySelector(".primary").value.trim();
         const freeUnitsValue = row.querySelector(".free-units").value.trim();
         const secondaryValue = row.querySelector(".secondary").value.trim();
-        if (!productId && !primaryPtsValue && !secondaryPtsValue && !primaryValue && !freeUnitsValue && !secondaryValue) continue;
-        if (!productId) { showMessage("Please select a product in every used row.", "error"); row.querySelector(".product-select").focus(); return; }
+
+
         const primaryPts = primaryPtsValue === "" ? 0 : parseFloat(primaryPtsValue);
         const secondaryPts = secondaryPtsValue === "" ? 0 : parseFloat(secondaryPtsValue);
         const primaryUnits = primaryValue === "" ? 0 : Number(primaryValue);
@@ -1067,7 +918,7 @@ async function submitData() {
         if (!Number.isInteger(secondaryUnits)) { showMessage("Secondary Quantity must be a whole number.", "error"); row.querySelector(".secondary").focus(); return; }
         details.push({product_id: productId, pts: primaryPts, primary_pts: primaryPts, secondary_pts: secondaryPts, primary_units: primaryUnits, primary_free_units: freeUnits, secondary_units: secondaryUnits});
     }
-    if (details.length === 0) { showMessage("Please enter at least one product before saving.", "error"); return; }
+    if (details.length === 0) { showMessage("No products are available to save.", "error"); return; }
     if (new Set(details.map(d => d.product_id)).size !== details.length) { showMessage("A product can be entered only once in this submission.", "error"); return; }
 
     const {data: existing, error: existingError} = await client.from("sales_entry_header").select("id").eq("stockist_id",stockistId).eq("hq_id",hqId).eq("month",month).eq("year",year).limit(1);
