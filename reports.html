@@ -41,7 +41,46 @@ let a='<div class="table"><table><thead><tr><th>HQ</th><th>Product</th><th>Targe
 function renderCum(h,d,t){const hm=new Map(h.map(x=>[x.id,x])),m=new Map(),get=(hq,mo)=>{const k=hq+'|'+mo;if(!m.has(k))m.set(k,{hq,mo,target:0,p:0,pfu:0,pfv:0,s:0});return m.get(k)};t.forEach(x=>get(x.hq_id,x.month).target+=n(x.target_value));d.forEach(x=>{const z=hm.get(x.entry_id);if(!z)return;const r=get(z.hq_id,z.month);r.p+=n(x.primary_value);r.pfu+=n(x.primary_free_units);r.pfv+=n(x.primary_free_value);r.s+=n(x.secondary_value)});let T=0,P=0,PFU=0,PFV=0,S=0,a='<div class="table"><table><thead><tr><th>HQ</th><th>Month</th><th>Target Value</th><th>Primary Value</th><th>Free Units Reimbursement Units</th><th>Free Units Reimbursement Value</th><th>Secondary Value</th><th>Primary Achievement %</th><th>Secondary Achievement %</th></tr></thead><tbody>';[...m.values()].sort((a,b)=>hname(a.hq).localeCompare(hname(b.hq))||a.mo-b.mo).forEach(r=>{T+=r.target;P+=r.p;PFU+=r.pfu;PFV+=r.pfv;S+=r.s;a+=`<tr><td class="left">${esc(hname(r.hq))}</td><td>${M[r.mo]}</td><td class="num">${money(r.target)}</td><td class="num">${money(r.p)}</td><td class="num">${qty(r.pfu)}</td><td class="num">${money(r.pfv)}</td><td class="num">${money(r.s)}</td><td class="num">${pct(r.p,r.target).toFixed(1)}%</td><td class="num">${pct(r.s,r.target).toFixed(1)}%</td></tr>`});a+=`<tr class="total"><td colspan="2" class="left">TOTAL</td><td class="num">${money(T)}</td><td class="num">${money(P)}</td><td class="num">${qty(PFU)}</td><td class="num">${money(PFV)}</td><td class="num">${money(S)}</td><td class="num">${pct(P,T).toFixed(1)}%</td><td class="num">${pct(S,T).toFixed(1)}%</td></tr></tbody></table></div>`;$('cum').innerHTML=a}
 async function generate(){const f={year:n($('year').value),sm:n($('sm').value),em:n($('em').value),hq:$('hq').value,product:$('product').value};if(f.sm>f.em){showError('Start Month cannot be after End Month.');return}const b=$('gen');b.disabled=true;b.textContent='LOADING...';$('msg').innerHTML='';try{const h=await headers(f),d=await details(h.map(x=>x.id)),t=await targets(f),ct=await cumulativeTargets(f),g=make(h,d,t);render(g);renderCum(h,d,ct);$('msg').innerHTML=`<div class="msg">${h.length} submission header(s) and ${d.length} submitted product row(s) included. Values are summed from saved submitted values.</div>`}catch(e){showError(e.message)}finally{b.disabled=false;b.textContent='GENERATE REPORT'}}
 function showError(e){$('msg').innerHTML=`<div class="msg error">Error: ${esc(e)}</div>`}
-function pdf(){const el=document.querySelector('.container');if(!el)return;html2pdf().set({margin:6,filename:'Hexadox_Sales_Report.pdf',image:{type:'jpeg',quality:.98},html2canvas:{scale:1.5,useCORS:true},jsPDF:{unit:'mm',format:'a3',orientation:'landscape'}}).from(el).save()}
+async function pdf(){
+ const source=document.querySelector('.container');
+ if(!source)return;
+ if(!$('sales').querySelector('table')){showError('Please generate the report before downloading the PDF.');return}
+ const clone=source.cloneNode(true);
+ // Keep the filter controls on the webpage, but exclude them from the PDF.
+ clone.querySelector('.card').remove();
+ clone.querySelectorAll('.table').forEach(w=>{w.style.overflow='visible';w.style.width='100%'});
+ clone.querySelectorAll('table').forEach(t=>{
+   t.style.width='100%';t.style.minWidth='0';t.style.tableLayout='fixed';
+   t.style.fontSize='8px';t.style.borderCollapse='collapse';
+   t.querySelectorAll('th,td').forEach(c=>{
+     c.style.whiteSpace='normal';c.style.overflowWrap='anywhere';
+     c.style.wordBreak='normal';c.style.padding='4px 3px';
+   });
+ });
+ const style=document.createElement('style');
+ style.textContent=`
+   .pdf-export{background:#fff!important;color:#222!important;width:100%!important;padding:0!important;margin:0!important}
+   .pdf-export .card{box-shadow:none!important;border:1px solid #ddd!important;border-radius:0!important;margin:0 0 8mm!important;padding:5mm!important;break-inside:auto!important;page-break-inside:auto!important}
+   .pdf-export h3{font-size:13px!important;margin:0 0 4mm!important}
+   .pdf-export table{page-break-inside:auto!important;break-inside:auto!important}
+   .pdf-export thead{display:table-header-group!important}
+   .pdf-export tfoot{display:table-footer-group!important}
+   .pdf-export tr{break-inside:avoid!important;page-break-inside:avoid!important}
+   .pdf-export th{background:#252525!important;color:#fff!important}
+   .pdf-export .total,.pdf-export .month-total{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ `;
+ clone.classList.add('pdf-export');clone.prepend(style);
+ const filename='Hexadox_Sales_Report.pdf';
+ try{
+   await html2pdf().set({
+     margin:[8,8,8,8],filename,
+     image:{type:'jpeg',quality:.98},
+     html2canvas:{scale:2,useCORS:true,scrollX:0,scrollY:0,backgroundColor:'#ffffff',windowWidth:1600},
+     jsPDF:{unit:'mm',format:'a3',orientation:'landscape'},
+     pagebreak:{mode:['css','legacy'],before:['#cum'],avoid:['tr','thead']}
+   }).from(clone).save();
+ }catch(e){showError('PDF export failed: '+(e?.message||e))}
+}
 init();
 </script>
 </body>
