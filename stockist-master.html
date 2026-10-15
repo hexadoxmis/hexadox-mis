@@ -140,6 +140,10 @@
             font-weight: bold;
         }
 
+        .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
+        .edit-button { background:#e8f0fe; color:#174ea6; }
+        .delete-button { background:#f8d7da; color:#842029; }
+        .cancel-button { background:#eee; color:#333; border:0; padding:10px 18px; border-radius:6px; cursor:pointer; font-weight:bold; }
         .action-button {
             border: none;
             padding: 7px 12px;
@@ -227,7 +231,7 @@
 
     <div class="card">
 
-        <h3>Add New Stockist</h3>
+        <h3 id="stockistFormTitle">Add New Stockist</h3>
 
         <div class="form-grid">
 
@@ -276,6 +280,7 @@
                 SAVE STOCKIST
 
             </button>
+            <button id="cancelEditButton" class="cancel-button" onclick="cancelStockistEdit()" style="display:none">CANCEL</button>
 
         </div>
 
@@ -318,6 +323,9 @@
 
 <script>
 
+
+let editingStockistId = null;
+let currentStockists = [];
 
 // ======================================================
 // INITIALIZE
@@ -480,6 +488,8 @@ async function loadStockists() {
     }
 
 
+    currentStockists = stockists;
+
     // Get HQ names
 
     const {
@@ -579,28 +589,11 @@ async function loadStockists() {
 
                 </td>
 
-                <td>
-
-                    <button
-                        class="action-button ${
-                            active
-                                ? "deactivate"
-                                : "activate"
-                        }"
-                        onclick="toggleStockist(
-                            '${stockist.id}',
-                            ${active}
-                        )">
-
-                        ${
-                            active
-                                ? "DEACTIVATE"
-                                : "ACTIVATE"
-                        }
-
-                    </button>
-
-                </td>
+                <td><div class="row-actions">
+                    <button class="action-button edit-button" onclick="editStockist('${stockist.id}')">EDIT</button>
+                    <button class="action-button ${active ? "deactivate" : "activate"}" onclick="toggleStockist('${stockist.id}',${active})">${active ? "DEACTIVATE" : "ACTIVATE"}</button>
+                    <button class="action-button delete-button" onclick="deleteStockist('${stockist.id}')">DELETE</button>
+                </div></td>
 
             </tr>
 
@@ -697,16 +690,17 @@ async function addStockist() {
 
     // Check duplicate name under same HQ
 
-    const {
-        data: existing,
-        error: checkError
-    } =
-        await client
-            .from("stockists")
-            .select("id")
-            .eq("stockist_name", name)
-            .eq("hq_id", hqId)
-            .limit(1);
+    let existingQuery = client
+        .from("stockists")
+        .select("id")
+        .eq("stockist_name", name)
+        .eq("hq_id", hqId);
+
+    if (editingStockistId) {
+        existingQuery = existingQuery.neq("id", editingStockistId);
+    }
+
+    const { data: existing, error: checkError } = await existingQuery.limit(1);
 
 
     if (checkError) {
@@ -723,7 +717,7 @@ async function addStockist() {
 
 
         saveButton.textContent =
-            "SAVE STOCKIST";
+            editingStockistId ? "SAVE CHANGES" : "SAVE STOCKIST";
 
 
         return;
@@ -745,7 +739,7 @@ async function addStockist() {
 
 
         saveButton.textContent =
-            "SAVE STOCKIST";
+            editingStockistId ? "SAVE CHANGES" : "SAVE STOCKIST";
 
 
         return;
@@ -753,25 +747,11 @@ async function addStockist() {
     }
 
 
-    // Insert stockist
-
-    const {
-        error
-    } =
-        await client
-            .from("stockists")
-            .insert({
-
-                stockist_name:
-                    name,
-
-                hq_id:
-                    hqId,
-
-                active:
-                    true
-
-            });
+    // Create a new stockist or save the selected edit.
+    const result = editingStockistId
+        ? await client.from("stockists").update({ stockist_name: name, hq_id: hqId }).eq("id", editingStockistId).select("id").single()
+        : await client.from("stockists").insert({ stockist_name: name, hq_id: hqId, active: true });
+    const error = result.error;
 
 
     if (error) {
@@ -794,7 +774,7 @@ async function addStockist() {
 
 
         saveButton.textContent =
-            "SAVE STOCKIST";
+            editingStockistId ? "SAVE CHANGES" : "SAVE STOCKIST";
 
 
         return;
@@ -804,18 +784,9 @@ async function addStockist() {
 
     // Success
 
-    showMessage(
-        "Stockist added successfully.",
-        "success"
-    );
-
-
-    nameInput.value =
-        "";
-
-
-    hqSelect.value =
-        "";
+    const wasEditing = Boolean(editingStockistId);
+    cancelStockistEdit();
+    showMessage(wasEditing ? "Stockist updated successfully." : "Stockist added successfully.", "success");
 
 
     saveButton.disabled =
@@ -833,6 +804,51 @@ async function addStockist() {
 
 
 // ======================================================
+// ======================================================
+// EDIT / CANCEL / DELETE STOCKIST
+// ======================================================
+function editStockist(stockistId) {
+    const stockist = currentStockists.find(item => String(item.id) === String(stockistId));
+    if (!stockist) return;
+    editingStockistId = stockist.id;
+    document.getElementById("stockistName").value = stockist.stockist_name;
+    document.getElementById("hq").value = stockist.hq_id;
+    document.getElementById("stockistFormTitle").textContent = "Edit Stockist";
+    document.getElementById("saveButton").textContent = "SAVE CHANGES";
+    document.getElementById("cancelEditButton").style.display = "inline-block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function cancelStockistEdit() {
+    editingStockistId = null;
+    document.getElementById("stockistName").value = "";
+    document.getElementById("hq").value = "";
+    document.getElementById("stockistFormTitle").textContent = "Add New Stockist";
+    document.getElementById("saveButton").textContent = "SAVE STOCKIST";
+    document.getElementById("cancelEditButton").style.display = "none";
+}
+async function deleteStockist(stockistId) {
+    const stockist = currentStockists.find(item => String(item.id) === String(stockistId));
+    if (!stockist) return;
+    const refs = await client.from("sales_entry_header").select("id").eq("stockist_id", stockistId).limit(1);
+    if (refs.error) {
+        showMessage("Unable to check stockist sales: " + refs.error.message, "error");
+        return;
+    }
+    if (refs.data?.length) {
+        showMessage("This stockist has sales history and cannot be deleted. Deactivate the stockist instead.", "error");
+        return;
+    }
+    if (!confirm("Permanently delete " + stockist.stockist_name + "? This cannot be undone.")) return;
+    const { error } = await client.from("stockists").delete().eq("id", stockistId).select("id").single();
+    if (error) {
+        showMessage("Unable to delete stockist: " + error.message, "error");
+        return;
+    }
+    if (String(editingStockistId) === String(stockistId)) cancelStockistEdit();
+    showMessage("Stockist deleted successfully.", "success");
+    await loadStockists();
+}
+
 // ACTIVATE / DEACTIVATE
 // ======================================================
 
