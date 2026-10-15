@@ -749,7 +749,7 @@ async function addStockist() {
 
     // Create a new stockist or save the selected edit.
     const result = editingStockistId
-        ? await client.from("stockists").update({ stockist_name: name, hq_id: hqId }).eq("id", editingStockistId)
+        ? await client.from("stockists").update({ stockist_name: name, hq_id: hqId }).eq("id", editingStockistId).select("id").single()
         : await client.from("stockists").insert({ stockist_name: name, hq_id: hqId, active: true });
     const error = result.error;
 
@@ -829,8 +829,17 @@ function cancelStockistEdit() {
 async function deleteStockist(stockistId) {
     const stockist = currentStockists.find(item => String(item.id) === String(stockistId));
     if (!stockist) return;
+    const refs = await client.from("sales_entry_header").select("id").eq("stockist_id", stockistId).limit(1);
+    if (refs.error) {
+        showMessage("Unable to check stockist sales: " + refs.error.message, "error");
+        return;
+    }
+    if (refs.data?.length) {
+        showMessage("This stockist has sales history and cannot be deleted. Deactivate the stockist instead.", "error");
+        return;
+    }
     if (!confirm("Permanently delete " + stockist.stockist_name + "? This cannot be undone.")) return;
-    const { error } = await client.from("stockists").delete().eq("id", stockistId);
+    const { error } = await client.from("stockists").delete().eq("id", stockistId).select("id").single();
     if (error) {
         showMessage("Unable to delete stockist: " + error.message, "error");
         return;
