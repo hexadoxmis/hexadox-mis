@@ -15,6 +15,7 @@
 .loading{text-align:center;padding:25px;color:#1557A6;font-weight:bold}.table-wrap{overflow-x:auto}table{width:100%;min-width:900px;border-collapse:collapse}th{background:#1557A6;color:#fff;padding:11px}td{padding:8px;border-bottom:1px solid #D7D2C8;text-align:right;color:#1557A6}td:first-child{text-align:left}.total{font-weight:bold;background:#EAF2FB;color:#1557A6}.abm{font-weight:bold;background:#FCEAE8;color:#B42318}
 @media(max-width:800px){.filters{grid-template-columns:repeat(2,1fr)}}@media(max-width:550px){.filters{grid-template-columns:1fr}.header h2{font-size:17px}.container{margin-top:12px}.toggle{flex-direction:column}}
 </style>
+<link rel="stylesheet" href="theme-yellow.css?v=20261018-glass">
 </head>
 <body>
 <div class="header"><h2>HEXADOX MIS — SUBMITTED DATA</h2><a class="back" href="home.html?v=20260903-3">HOME</a></div>
@@ -70,5 +71,25 @@ let html='<h3>Submitted Target Sheet</h3><p><b>'+months[m]+' '+y+'</b> | '+esc(h
 async function allTargets(m,y){const{data:targets,error}=await client.from('targets').select('product_id,target_units').eq('month',m).eq('year',y);if(error)throw error;const{data:products,error:productError}=await client.from('products').select('id,product_name').order('product_name');if(productError)throw productError;const map={};(products||[]).forEach(p=>map[p.id]=p.product_name);const grouped={};targets.forEach(t=>grouped[t.product_id]=(grouped[t.product_id]||0)+(Number(t.target_units)||0));let total=0;let html='<h3>Submitted Targets — All HQs</h3><p><b>'+months[m]+' '+y+'</b> | <b>Cumulative ABM Target</b></p><div class="table-wrap"><table><thead><tr><th>Product</th><th>Cumulative Target Units</th></tr></thead><tbody>';(products||[]).sort((a,b)=>a.product_name.localeCompare(b.product_name,'en',{numeric:true})).forEach(p=>{const u=grouped[p.id]||0;total+=u;html+='<tr><td>'+esc(p.product_name)+'</td><td>'+n(u)+'</td></tr>'});html+='<tr class="abm"><td>ABM TOTAL</td><td>'+n(total)+'</td></tr></tbody></table></div>';$('result').className='';$('result').style.color='';$('result').innerHTML=html}
 init();
 </script>
+<!-- SUBMITTED DATA GLASS OVERRIDES -->
+<style>
+body{background:radial-gradient(ellipse at 12% 10%,rgba(255,255,255,.92),transparent 34%),radial-gradient(ellipse at 90% 18%,rgba(255,223,120,.48),transparent 36%),linear-gradient(135deg,#fff9e2,#f7e9b9 52%,#fff8df)!important;color:#18345f!important}
+.header{background:rgba(255,250,231,.58)!important;backdrop-filter:blur(22px) saturate(155%);-webkit-backdrop-filter:blur(22px) saturate(155%);border-bottom:1px solid rgba(255,255,255,.8)!important;box-shadow:0 8px 30px rgba(113,86,25,.13)!important}
+.header h2{color:#18345f!important}
+.container .card{background:rgba(255,255,255,.52)!important;backdrop-filter:blur(22px) saturate(155%);-webkit-backdrop-filter:blur(22px) saturate(155%);border:1px solid rgba(255,255,255,.8)!important;border-radius:16px!important;box-shadow:0 10px 30px rgba(113,86,25,.13),inset 0 1px 0 rgba(255,255,255,.8)!important}
+.card h3,label{color:#18345f!important}
+.toggle a{background:rgba(255,255,255,.48)!important;border:1px solid rgba(214,165,46,.55)!important;color:#18345f!important;border-radius:10px!important}
+.toggle a.active{background:linear-gradient(135deg,#f4d36e,#dfb53f)!important;color:#18345f!important}
+select{background:rgba(255,255,255,.68)!important;color:#18345f!important;border:1px solid rgba(177,151,83,.35)!important;border-radius:9px!important}
+.search button,.back{background:linear-gradient(135deg,#f4d36e,#dfb53f)!important;color:#18345f!important;border:1px solid rgba(255,255,255,.8)!important;border-radius:10px!important}
+.loading{color:#49658a!important}
+table{background:rgba(255,255,255,.45)!important;border-collapse:separate!important;border-spacing:0!important;border-radius:10px!important;overflow:hidden}
+th{background:rgba(244,225,169,.75)!important;color:#18345f!important;border-color:rgba(255,255,255,.75)!important}
+td{background:rgba(255,255,255,.4)!important;color:#18345f!important;border-color:rgba(255,255,255,.6)!important}
+tr:nth-child(even) td{background:rgba(255,255,255,.56)!important}
+.total{background:rgba(246,225,164,.68)!important;color:#18345f!important}
+.abm{background:rgba(255,232,178,.72)!important;color:#76502a!important}
+@media(max-width:800px){.container .card{padding:16px}}
+</style>
 </body>
 </html>
