@@ -557,7 +557,328 @@ async function createUser() {
     ) {
 
         showMessage(
-            "Username can contain only letters, numbers, dot, underscore and hyphen…1253 tokens truncated…s,
+            "Username can contain only letters, numbers, dot, underscore and hyphen.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    if (password.length < 6) {
+
+        showMessage(
+            "Password must contain at least 6 characters.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    if (!role) {
+
+        showMessage(
+            "Please select a role.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    if (!hqIds.length) {
+
+        showMessage(
+            "Please select an HQ.",
+            "error"
+        );
+
+        return;
+
+    }
+
+
+    // ==========================================
+    // CONFIRM
+    // ==========================================
+
+    const confirmed =
+        confirm(
+            "Create this user?\n\n" +
+            "Name: " +
+            fullName +
+            "\nUsername: " +
+            username +
+            "\nRole: " + role +
+            "\nAssigned HQs: " + hqIds.map(id => (window.activeHQs || []).find(h => h.id === id)?.hq_name || "").filter(Boolean).join(", ")
+        );
+
+
+    if (!confirmed) {
+
+        return;
+
+    }
+
+
+    const button =
+        document.getElementById(
+            "createButton"
+        );
+
+
+    button.disabled =
+        true;
+
+
+    button.textContent =
+        "CREATING...";
+
+
+    // ==========================================
+    // CALL EDGE FUNCTION
+    // ==========================================
+
+    // ==========================================
+// GET CURRENT SESSION
+// ==========================================
+
+const {
+    data: sessionData,
+    error: sessionError
+} = await client.auth.getSession();
+
+
+if (
+    sessionError ||
+    !sessionData.session
+) {
+
+    showMessage(
+        "Your login session has expired. Please login again.",
+        "error"
+    );
+
+    button.disabled = false;
+    button.textContent = "CREATE USER";
+
+    return;
+
+}
+
+
+const accessToken =
+    sessionData.session.access_token;
+
+
+// ==========================================
+// CALL EDGE FUNCTION
+// ==========================================
+
+const {
+    data,
+    error
+} =
+    await client.functions.invoke(
+        "create-user",
+        {
+
+            headers: {
+
+                Authorization:
+                    "Bearer " +
+                    accessToken
+
+            },
+
+            body: {
+
+                full_name:
+                    fullName,
+
+                username:
+                    username,
+
+                password:
+                    password,
+
+                role:
+                    role,
+
+                hq_ids:
+                    hqIds
+
+            }
+
+        }
+    );
+
+
+    console.log(
+        "CREATE USER RESPONSE:",
+        data
+    );
+
+
+    console.log(
+        "CREATE USER ERROR:",
+        error
+    );
+
+
+    // ==========================================
+    // ERROR
+    // ==========================================
+
+    if (error) {
+
+        let errorMessage =
+            error.message;
+
+
+        try {
+
+            if (
+                error.context
+            ) {
+
+                const response =
+                    await error.context.json();
+
+                if (
+                    response &&
+                    response.error
+                ) {
+
+                    errorMessage =
+                        response.error;
+
+                }
+
+            }
+
+        } catch (e) {
+
+            console.log(
+                "Could not read function error."
+            );
+
+        }
+
+
+        showMessage(
+            errorMessage,
+            "error"
+        );
+
+
+        button.disabled =
+            false;
+
+
+        button.textContent =
+            "CREATE USER";
+
+
+        return;
+
+    }
+
+
+    // ==========================================
+    // FUNCTION-LEVEL ERROR
+    // ==========================================
+
+    if (
+        !data ||
+        data.success !== true
+    ) {
+
+        showMessage(
+            data?.error ||
+            "User could not be created.",
+            "error"
+        );
+
+
+        button.disabled =
+            false;
+
+
+        button.textContent =
+            "CREATE USER";
+
+
+        return;
+
+    }
+
+
+    // ==========================================
+    // SUCCESS
+    // ==========================================
+
+    showMessage(
+        "User created successfully.",
+        "success"
+    );
+
+
+    document
+        .getElementById("fullName")
+        .value = "";
+
+
+    document
+        .getElementById("username")
+        .value = "";
+
+
+    document
+        .getElementById("password")
+        .value = "";
+
+
+    document
+        .getElementById("role")
+        .value = "";
+
+
+    Array.from(document.getElementById("hq").options).forEach(option => option.selected = false);
+
+
+    button.disabled =
+        false;
+
+
+    button.textContent =
+        "CREATE USER";
+
+
+    await loadUsers();
+
+}
+
+
+
+// ======================================================
+// LOAD USERS
+// ======================================================
+
+async function loadUsers() {
+
+    const userArea =
+        document.getElementById(
+            "userArea"
+        );
+
+
+    const {
+        data: profiles,
         error
     } =
         await client
