@@ -337,6 +337,28 @@ select {
 
 
 
+<div class="card">
+    <h3>Assign HQs to Existing Users</h3>
+    <div class="info">ABMs can be assigned multiple HQs. Field Staff remain limited to one assigned HQ.</div>
+    <div class="form-grid">
+        <div class="form-group">
+            <label for="assignmentUser">User</label>
+            <select id="assignmentUser" onchange="loadAssignmentsForUser()">
+                <option value="">Select an ABM or Field Staff user</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="assignmentHQs">Assigned HQs</label>
+            <select id="assignmentHQs" multiple size="5" aria-describedby="assignmentHelp" disabled></select>
+            <small id="assignmentHelp">Select a user to manage HQ access.</small>
+        </div>
+    </div>
+    <div class="save-area">
+        <button id="saveAssignmentsButton" class="save-button" onclick="saveAssignments()" disabled>SAVE HQ ASSIGNMENTS</button>
+    </div>
+    <div id="assignmentMessage" class="message" role="status"></div>
+</div>
+
 <!-- ==========================================
      USERS
 ========================================== -->
@@ -373,37 +395,10 @@ select {
 // ======================================================
 
 async function initializePage() {
-
-    const {
-        data,
-        error
-    } =
-        await client.auth.getSession();
-
-
-    console.log(
-        "SESSION:",
-        data
-    );
-
-
-    if (
-        error ||
-        !data.session
-    ) {
-
-        window.location.href =
-            "index.html";
-
-        return;
-
-    }
-
-
+    const auth = await requireAdmin();
+    if (!auth) return;
     await loadHQs();
-
     await loadUsers();
-
 }
 
 
@@ -448,7 +443,6 @@ async function loadHQs() {
 
     }
 
-
     hqSelect.innerHTML =
         '<option value="">Select HQ</option>';
 
@@ -474,7 +468,22 @@ async function loadHQs() {
         }
     );
 
+    window.activeHQs = hqs;
+    updateCreateHQControl();
+
 }
+
+function updateCreateHQControl() {
+    const role = document.getElementById("role").value;
+    const select = document.getElementById("hq");
+    const label = document.querySelector('label[for="hq"]');
+    const isABM = role === "ABM";
+    select.multiple = isABM;
+    select.size = isABM ? Math.min(8, Math.max(3, (window.activeHQs || []).length)) : 1;
+    label.textContent = isABM ? "Assigned HQs (select one or more)" : "HQ";
+}
+
+document.getElementById("role").addEventListener("change", updateCreateHQControl);
 
 
 
@@ -511,10 +520,8 @@ async function createUser() {
             .value;
 
 
-    const hqId =
-        document
-            .getElementById("hq")
-            .value;
+    const hqIds = Array.from(document.getElementById("hq").selectedOptions)
+        .map(option => option.value).filter(Boolean);
 
 
     // ==========================================
@@ -550,330 +557,7 @@ async function createUser() {
     ) {
 
         showMessage(
-            "Username can contain only letters, numbers, dot, underscore and hyphen.",
-            "error"
-        );
-
-        return;
-
-    }
-
-
-    if (password.length < 6) {
-
-        showMessage(
-            "Password must contain at least 6 characters.",
-            "error"
-        );
-
-        return;
-
-    }
-
-
-    if (!role) {
-
-        showMessage(
-            "Please select a role.",
-            "error"
-        );
-
-        return;
-
-    }
-
-
-    if (!hqId) {
-
-        showMessage(
-            "Please select an HQ.",
-            "error"
-        );
-
-        return;
-
-    }
-
-
-    // ==========================================
-    // CONFIRM
-    // ==========================================
-
-    const confirmed =
-        confirm(
-            "Create this user?\n\n" +
-            "Name: " +
-            fullName +
-            "\nUsername: " +
-            username +
-            "\nRole: " +
-            role
-        );
-
-
-    if (!confirmed) {
-
-        return;
-
-    }
-
-
-    const button =
-        document.getElementById(
-            "createButton"
-        );
-
-
-    button.disabled =
-        true;
-
-
-    button.textContent =
-        "CREATING...";
-
-
-    // ==========================================
-    // CALL EDGE FUNCTION
-    // ==========================================
-
-    // ==========================================
-// GET CURRENT SESSION
-// ==========================================
-
-const {
-    data: sessionData,
-    error: sessionError
-} = await client.auth.getSession();
-
-
-if (
-    sessionError ||
-    !sessionData.session
-) {
-
-    showMessage(
-        "Your login session has expired. Please login again.",
-        "error"
-    );
-
-    button.disabled = false;
-    button.textContent = "CREATE USER";
-
-    return;
-
-}
-
-
-const accessToken =
-    sessionData.session.access_token;
-
-
-// ==========================================
-// CALL EDGE FUNCTION
-// ==========================================
-
-const {
-    data,
-    error
-} =
-    await client.functions.invoke(
-        "create-user",
-        {
-
-            headers: {
-
-                Authorization:
-                    "Bearer " +
-                    accessToken
-
-            },
-
-            body: {
-
-                full_name:
-                    fullName,
-
-                username:
-                    username,
-
-                password:
-                    password,
-
-                role:
-                    role,
-
-                hq_id:
-                    hqId
-
-            }
-
-        }
-    );
-
-
-    console.log(
-        "CREATE USER RESPONSE:",
-        data
-    );
-
-
-    console.log(
-        "CREATE USER ERROR:",
-        error
-    );
-
-
-    // ==========================================
-    // ERROR
-    // ==========================================
-
-    if (error) {
-
-        let errorMessage =
-            error.message;
-
-
-        try {
-
-            if (
-                error.context
-            ) {
-
-                const response =
-                    await error.context.json();
-
-                if (
-                    response &&
-                    response.error
-                ) {
-
-                    errorMessage =
-                        response.error;
-
-                }
-
-            }
-
-        } catch (e) {
-
-            console.log(
-                "Could not read function error."
-            );
-
-        }
-
-
-        showMessage(
-            errorMessage,
-            "error"
-        );
-
-
-        button.disabled =
-            false;
-
-
-        button.textContent =
-            "CREATE USER";
-
-
-        return;
-
-    }
-
-
-    // ==========================================
-    // FUNCTION-LEVEL ERROR
-    // ==========================================
-
-    if (
-        !data ||
-        data.success !== true
-    ) {
-
-        showMessage(
-            data?.error ||
-            "User could not be created.",
-            "error"
-        );
-
-
-        button.disabled =
-            false;
-
-
-        button.textContent =
-            "CREATE USER";
-
-
-        return;
-
-    }
-
-
-    // ==========================================
-    // SUCCESS
-    // ==========================================
-
-    showMessage(
-        "User created successfully.",
-        "success"
-    );
-
-
-    document
-        .getElementById("fullName")
-        .value = "";
-
-
-    document
-        .getElementById("username")
-        .value = "";
-
-
-    document
-        .getElementById("password")
-        .value = "";
-
-
-    document
-        .getElementById("role")
-        .value = "";
-
-
-    document
-        .getElementById("hq")
-        .value = "";
-
-
-    button.disabled =
-        false;
-
-
-    button.textContent =
-        "CREATE USER";
-
-
-    await loadUsers();
-
-}
-
-
-
-// ======================================================
-// LOAD USERS
-// ======================================================
-
-async function loadUsers() {
-
-    const userArea =
-        document.getElementById(
-            "userArea"
-        );
-
-
-    const {
-        data: profiles,
+            "Username can contain only letters, numbers, dot, underscore and hyphen…1253 tokens truncated…s,
         error
     } =
         await client
@@ -897,6 +581,8 @@ async function loadUsers() {
         return;
 
     }
+
+    window.userProfiles = profiles || [];
 
 
     if (
@@ -930,12 +616,8 @@ async function loadUsers() {
 
 
     if (mappingError) {
-
-        console.error(
-            "MAPPING ERROR:",
-            mappingError
-        );
-
+        userArea.innerHTML = '<div class="message error" style="display:block;">Unable to load HQ assignments: ' + escapeHTML(mappingError.message) + '</div>';
+        return;
     }
 
 
@@ -944,13 +626,19 @@ async function loadUsers() {
     // ==========================================
 
     const {
-        data: hqs
+        data: hqs,
+        error: hqError
     } =
         await client
             .from("hqs")
             .select(
                 "id, hq_name"
             );
+
+    if (hqError) {
+        userArea.innerHTML = '<div class="message error" style="display:block;">Unable to load HQs: ' + escapeHTML(hqError.message) + '</div>';
+        return;
+    }
 
 
     const hqMap = {};
@@ -969,18 +657,9 @@ async function loadUsers() {
     const userHQMap = {};
 
 
-    (mappings || []).forEach(
-        mapping => {
-
-            userHQMap[
-                mapping.user_id
-            ] =
-                hqMap[
-                    mapping.hq_id
-                ] || "";
-
-        }
-    );
+    (mappings || []).forEach(mapping => {
+        (userHQMap[mapping.user_id] ||= []).push(hqMap[mapping.hq_id] || "");
+    });
 
 
     // ==========================================
@@ -1025,7 +704,7 @@ async function loadUsers() {
                     padding:11px;
                     text-align:left;
                 ">
-                    HQ
+                    Assigned HQs
                 </th>
 
                 <th style="
@@ -1074,11 +753,7 @@ async function loadUsers() {
                         padding:10px;
                         border-bottom:1px solid #ddd;
                     ">
-                        ${escapeHTML(
-                            userHQMap[
-                                profile.id
-                            ] || ""
-                        )}
+                        ${escapeHTML((userHQMap[profile.id] || []).filter(Boolean).join(", "))}
                     </td>
 
                     <td style="
@@ -1120,6 +795,83 @@ async function loadUsers() {
     userArea.innerHTML =
         html;
 
+    const assignmentUser = document.getElementById("assignmentUser");
+    const previousId = assignmentUser.value;
+    assignmentUser.innerHTML = '<option value="">Select an ABM or Field Staff user</option>';
+    profiles.filter(profile => profile.role === "ABM" || profile.role === "Field Staff")
+        .forEach(profile => assignmentUser.add(new Option(`${profile.full_name || "Unnamed"} (${profile.role})`, profile.id)));
+    if (profiles.some(profile => profile.id === previousId)) assignmentUser.value = previousId;
+    await loadAssignmentsForUser();
+
+}
+
+async function loadAssignmentsForUser() {
+    const userId = document.getElementById("assignmentUser").value;
+    const user = (window.userProfiles || []).find(profile => profile.id === userId);
+    const select = document.getElementById("assignmentHQs");
+    const button = document.getElementById("saveAssignmentsButton");
+    if (!userId || !user) {
+        select.innerHTML = "";
+        select.disabled = true;
+        button.disabled = true;
+        return;
+    }
+    const [{ data: mappings, error: mappingError }, { data: hqs, error: hqError }] = await Promise.all([
+        client.from("user_hq_mapping").select("hq_id").eq("user_id", userId),
+        client.from("hqs").select("id,hq_name,active").eq("active", true).order("hq_name")
+    ]);
+    if (mappingError || hqError) {
+        showAssignmentMessage("Unable to load HQ assignments: " + (mappingError || hqError).message, "error");
+        return;
+    }
+    const assigned = new Set((mappings || []).map(mapping => mapping.hq_id));
+    select.innerHTML = "";
+    (hqs || []).forEach(hq => select.add(new Option(hq.hq_name, hq.id, false, assigned.has(hq.id))));
+    const isABM = user.role === "ABM";
+    select.multiple = isABM;
+    select.size = isABM ? Math.min(8, Math.max(3, (hqs || []).length)) : 1;
+    select.disabled = false;
+    document.querySelector('label[for="assignmentHQs"]').textContent = isABM ? "Assigned HQs (select one or more)" : "Assigned HQ";
+    document.getElementById("assignmentHelp").textContent = isABM
+        ? "Use Ctrl (Windows) or Command (Mac) to select multiple HQs."
+        : "Field Staff can have one assigned HQ.";
+    button.disabled = false;
+    showAssignmentMessage("", "success");
+}
+
+async function saveAssignments() {
+    const userId = document.getElementById("assignmentUser").value;
+    const user = (window.userProfiles || []).find(profile => profile.id === userId);
+    const hqIds = Array.from(document.getElementById("assignmentHQs").selectedOptions).map(option => option.value);
+    if (!user || !hqIds.length) {
+        showAssignmentMessage(user?.role === "ABM" ? "Assign at least one HQ to an ABM." : "Select one HQ for this Field Staff user.", "error");
+        return;
+    }
+    if (user.role === "Field Staff" && hqIds.length !== 1) {
+        showAssignmentMessage("Field Staff must have exactly one assigned HQ.", "error");
+        return;
+    }
+    const button = document.getElementById("saveAssignmentsButton");
+    button.disabled = true;
+    button.textContent = "SAVING...";
+    try {
+        const { error } = await client.rpc("set_user_hq_assignments", { p_user_id: userId, p_hq_ids: hqIds });
+        if (error) throw error;
+        showAssignmentMessage("HQ assignments saved successfully.", "success");
+        await loadUsers();
+    } catch (error) {
+        showAssignmentMessage("Unable to save HQ assignments: " + error.message, "error");
+    } finally {
+        button.disabled = false;
+        button.textContent = "SAVE HQ ASSIGNMENTS";
+    }
+}
+
+function showAssignmentMessage(text, type) {
+    const message = document.getElementById("assignmentMessage");
+    message.textContent = text;
+    message.className = text ? "message " + type : "message";
+    message.style.display = text ? "block" : "none";
 }
 
 
